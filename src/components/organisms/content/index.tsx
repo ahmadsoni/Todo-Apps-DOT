@@ -1,17 +1,17 @@
 import React, {useState, useMemo, useEffect, useCallback} from 'react';
 import {PlusOutlined} from '@ant-design/icons';
-import {Button, Divider, notification, Space} from 'antd';
+import {Button, notification} from 'antd';
 import type {NotificationPlacement} from 'antd/es/notification/interface';
 import type {SizeType} from 'antd/es/config-provider/SizeContext';
 import AddTodo from '../../molecules/addTodo';
 import CardTodo from '../../molecules/cardTodo';
 import * as api from '@/services/activityApi';
-import {useMutation, type UseMutationResult, type MutationFunction, useQuery, QueryClient, QueryCache} from 'react-query';
+import {useMutation, type UseMutationResult, type MutationFunction, useQuery, QueryClient} from 'react-query';
 import {type Activity, type AddActivityForm, type CardActivity} from '@/services/data-types';
 
-const queryClient = new QueryClient();
-const queryCache = new QueryCache();
+
 function useAddActivity(): UseMutationResult<Activity[], Error, AddActivityForm> {
+	const queryClient = new QueryClient();
 	const mutationFn: MutationFunction<Activity[], AddActivityForm> = async (input) => {
 		const {title, email} = input;
 		const data = await api.addActivity(title, email);
@@ -21,22 +21,28 @@ function useAddActivity(): UseMutationResult<Activity[], Error, AddActivityForm>
 	 return useMutation(mutationFn, {
 		async onSuccess() {
 			await queryClient.invalidateQueries('todo-apps');
-			console.log('hoy disini');
 		}});
 }
 
 export default function Content() {
+	 const queryClient = new QueryClient({
+		defaultOptions: {
+			queries: {
+				staleTime: Infinity,
+			},
+		},
+	});
 	const [info, contextHolder] = notification.useNotification();
 	const [size, setSize] = useState<SizeType>('large');
 	
 	const {mutate, isLoading: addActivityLoading, isError: addActivityError, isSuccess: addActivitySuccess} = useAddActivity();
 	const {data, isLoading: getActivityLoading, isError: getActivityError, isSuccess: getActivitySuccess, refetch: getActivityRefetch} = useQuery('todo-apps', api.getActivity, {
-		refetchOnWindowFocus: false,
+		refetchOnWindowFocus: true,
 		refetchOnMount: true,
 	});
 
 	const addTodoList = async () => {
-		 mutate({title: 'New test5', email: 'wow@gmail.com'});
+		 mutate({title: 'New Activity', email: 'wow@gmail.com'});
 	};
 
 	const notificationSucces = (placement: NotificationPlacement) => {
@@ -70,6 +76,29 @@ export default function Content() {
 		void handleActivityUpdate();
 	}, [addActivitySuccess, addActivityError]);
 
+	const invalidateQueries = async () => {
+		// Await queryClient.invalidateQueries('todo-activity', {
+		// 	exact: true,
+		// 	refetchActive: true,
+		// 	refetchInactive: false,
+		// }, {throwOnError: true, cancelRefetch: true});
+		// await queryClient.invalidateQueries('list-todo', {
+		// 	exact: true,
+		// 	refetchActive: true,
+		// 	refetchInactive: true,
+		// }, {throwOnError: true, cancelRefetch: true});
+		//  queryClient.removeQueries('todo-activity', {exact: true});
+		//  queryClient.removeQueries('list-todo', {exact: true});
+		await queryClient.invalidateQueries('list-todo');
+		await queryClient.invalidateQueries('todo-activity');
+		console.log('yess masuk');
+	};
+
+	useEffect(() => {
+		void invalidateQueries();
+		void getActivityRefetch();
+	}, []);
+
 
 	return (
 		<main className='bg-light grow'>
@@ -83,9 +112,9 @@ export default function Content() {
 					</Button>
 				</div>
 				<div className='pb-15 pt-10'>
-					{data && data.length <= 0 ? <AddTodo /> : <div className='grid grid-cols-4 gap-5'>
+					{data && data.length <= 0 ? <AddTodo /> : <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-4'>
 						{data?.map((data: CardActivity) => (
-							<div key={data.id}>
+							<div key={data.id} className='mx-auto'>
 								<CardTodo key={data.id} title={data.title} created_at={data.created_at} id={data.id}/>
 							</div>
 						))}

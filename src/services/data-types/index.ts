@@ -28,7 +28,7 @@ export type Todo = {
 	priority: string;
 	created_at: string;
 	updated_at: string;
-	deleted_at: string | undefined;
+	deleted_at?: string | undefined;
 };
 
 export type UpdateTodo = {
@@ -41,9 +41,43 @@ export type AddActivityForm = {
 	title: string;
 	email: string;
 };
+export type UpdateActivityForm = {
+	id: string;
+	title?: string;
+};
 
+export type UpdateCheckTodoProps = {
+	activityId: string;
+	title?: string;
+	isActive: boolean;
+};
 export type CardActivity = {
 	id: number;
 	title: string;
 	created_at: string;
+};
+
+export type GetStaticProps = {
+	params: {
+		random: string;
+	};
+};
+
+export type GetIdProps = {
+	random: string;
+};
+
+export type SendIdProps = {
+	id: string;
+};
+
+export type ContentActivityProps = {
+	id: string;
+	title?: string;
+};
+
+export type AddTodoList = {
+	activityId: string;
+	title?: string;
+	priority?: string;
 };

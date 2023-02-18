@@ -2,27 +2,26 @@
 import axios, {type AxiosInstance, type AxiosResponse} from 'axios';
 import {type UpdateTodo, type Todo} from './data-types';
 
-const api: AxiosInstance = axios.create({
+const base: AxiosInstance = axios.create({
 	baseURL: process.env.NEXT_PUBLIC_BASE_URL,
 });
 
-export const getTodo = async (activityId: number): Promise<{data: UpdateTodo[]}> => {
-	const response: AxiosResponse<{data: UpdateTodo[]}> = await api.get(`/todo-items/${activityId}`);
+export const getTodo = async (activityId: string): Promise<{data: Todo[]}> => {
+	const response: AxiosResponse<{data: Todo[]}> = await base.get(`/todo-items?activity_group_id=${activityId}`);
 	return response.data;
 };
 
-export const updateCheckTodo = async (activityId: number, isActive: boolean): Promise<{data: UpdateTodo[]}> => {
-	const response: AxiosResponse<{data: UpdateTodo[]}> = await api.patch(`/todo-items/${activityId}`, {
+export const updateCheckTodo = async (activityId: string, isActive: boolean, title?: string): Promise<{data: Todo[]}> => {
+	const response: AxiosResponse<{data: Todo[]}> = await base.patch(`/todo-items/${activityId}`, {
 		is_active: isActive,
+		title,
 	});
 	return response.data;
 };
 
-export const addTodo = async (activityId: number,
-	title: string,
-	priority: string): Promise<{data: UpdateTodo[]}>  => {
-	const response: AxiosResponse<{data: UpdateTodo[]}> = await api.post('/todo-items', {
-		activity_id: activityId,
+export const addTodo = async (activityId: string, title?: string, priority?: string): Promise<{data: Todo[]}>  => {
+	const response: AxiosResponse<{data: Todo[]}> = await base.post('/todo-items', {
+		activity_group_id: activityId,
 		title,
 		priority,
 	});
@@ -31,15 +30,15 @@ export const addTodo = async (activityId: number,
 
 export const updateTodo = async (activityId: number,
 	title: string,
-	priority: string): Promise<{data: UpdateTodo[]}> => {
-	const response: AxiosResponse<{data: UpdateTodo[]}> = await api.patch(`/todo-items/${activityId}`, {
+	priority: string): Promise<{data: Todo[]}> => {
+	const response: AxiosResponse<{data: Todo[]}> = await base.patch(`/todo-items/${activityId}`, {
 		title,
 		priority,
 	});
 	return response.data;
 };
 
-export const deleteTodo = async (activityId: number): Promise<{data: Todo[]}> => {
-	const response: AxiosResponse<{data: Todo[]}> = await api.delete(`/todo-items/${activityId}`);
+export const deleteTodoList = async (activityId: string): Promise<{data: Todo[]}> => {
+	const response: AxiosResponse<{data: Todo[]}> = await base.delete(`/todo-items/${activityId}`);
 	return response.data;
 };

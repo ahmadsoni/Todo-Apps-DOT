@@ -1,12 +1,29 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import {Fragment, useState} from 'react';
+import {Fragment, useEffect, useState, useCallback} from 'react';
 import {Dialog, Transition} from '@headlessui/react';
 import {Card, Row} from 'antd';
 import Trash from '@/images/trash.svg';
 import Warning from '@/images/warning.svg';
-import Information from '@/images/information-modal.svg';
+import InformationSuccess from '@/images/information-success.svg';
+import InformationFailed from '@/images/information-failed.svg';
 import Link from 'next/link';
-import {type CardActivity} from '@/services/data-types';
+import {type CardActivity, type Activity} from '@/services/data-types';
+import * as api from '@/services/activityApi';
+import {useMutation, type UseMutationResult, type MutationFunction, useQuery, QueryClient} from 'react-query';
+
+const queryClient = new QueryClient();
+const useDeleteActivity = (id: number): UseMutationResult<Activity[], Error, number> => {
+	const mutationFn: MutationFunction<Activity[], number> = async (id) => {
+		const data = await api.deleteActivity(id);
+		return data;
+	};
+
+	return useMutation(mutationFn, {
+		async onSuccess() {
+			await queryClient.invalidateQueries('todo-apps');
+		},
+	});
+};
 
 export default function CardTodo(props: CardActivity) {
 	const {id, title, created_at} = props;
@@ -15,20 +32,48 @@ export default function CardTodo(props: CardActivity) {
 	const formattedDate: string = date.toLocaleDateString('id-ID', options);
 	const [isOpen, setIsOpen] = useState(false);
 	const [isOpen2, setIsOpen2] = useState(false);
+	const {refetch} = useQuery('todo-apps', {
+		refetchOnWindowFocus: true,
+		refetchOnMount: true,
+	});
+	const {mutate, isLoading: deleteActivityLoading, isError: deleteActivityError, isSuccess: deleteActivitySuccess} = useDeleteActivity(id);
+	const deleteModal = () => {
+		setIsOpen(true);
+	};
+
+	const cancelModal = () => {
+		setIsOpen(false);
+	};
+	
+	const deleteAction = async () => {
+		mutate(id);
+	};
+
+	const deleteHandle = useCallback(() => {
+		if (deleteActivityError || deleteActivitySuccess) {
+			setIsOpen(false);
+			setIsOpen2(true);
+			setTimeout(async () => {
+				await refetch();
+			}, 1500);
+		}
+	}, [deleteActivityError, deleteActivitySuccess]);
+
+	useEffect(() => {
+		deleteHandle();
+	}, [deleteActivityError, deleteActivitySuccess]);
 	return (
-		<>
-			<div style={{width: 240, marginTop: 16}} className='bg-white shadow-lg rounded-xl h-56 p-4 flex flex-col justify-between'>
-				<Link href={`/detail/${id}`}>
-					<h4  className="text-lg font-bold cursor-pointer pt-2 hover:text-primary">{title}</h4>
-				</Link>
+		<div>
+			<div className='bg-white shadow-lg rounded-xl h-56 p-4 flex flex-col w-[320px] sm:w-[230px] mt-4'>
+				<h4  className="grow text-lg font-bold cursor-pointer pt-2 hover:text-primary">
+					<Link href={`/detail/${id}`}>
+						{title}
+					</Link>
+				</h4>
 				<div className='flex justify-between'>
 					<span className="text-secondary font-semibold text-base font-poppins">{formattedDate}</span>
 					<div className='cursor-pointer flex items-center'>
-						<Trash clasName="w-full" onClick={
-							() => {
-								setIsOpen(true); 
-							}
-						}/>
+						<Trash clasName="w-full" onClick={deleteModal}/>
 					</div>
 				</div>
 			</div>
@@ -60,20 +105,15 @@ export default function CardTodo(props: CardActivity) {
 								leaveTo="opacity-0 scale-95"
 							>
 								<Dialog.Panel className="relative transform text-left shadow-xl transition-all w-fit my-auto opacity-100 translate-y-0 sm:scale-100">
-									<div className='bg-white p-6 w-[497px] rounded-xl'>
+									<div className='bg-white p-6 rounded-xl w-full sm:w-[497px]'>
 										<Warning  className='mx-auto'/>
 										<div className='py-10 text-lg text-center'>
                                             Apakah anda yakin menghapus activity
 											<span className="font-bold"> &quot;{title}&quot;?</span>
 										</div>
 										<div className="flex justify-center gap-6">
-											<button type='button' className="inline-flex justify-center rounded-full border border-transparent bg-[#F4F4F4] px-10 py-4 text-base font-medium text-slate-600 hover:bg-[#faffff] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" onClick={() => {
-												setIsOpen(false);
-											}}>Batal</button>
-											<button className="inline-flex justify-center rounded-full border border-transparent bg-[#ED4C5C] px-10 py-4 text-base font-medium text-white hover:bg-[#fc5e6e] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" onClick={() => {
-												setIsOpen(false);
-												setIsOpen2(true);
-											}}>Hapus</button>
+											<button type='button' className="inline-flex justify-center rounded-full border border-transparent bg-[#F4F4F4] px-10 py-4 text-base font-medium text-slate-600 hover:bg-[#faffff] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" onClick={cancelModal}>Batal</button>
+											<button className="inline-flex justify-center rounded-full border border-transparent bg-[#ED4C5C] px-10 py-4 text-base font-medium text-white hover:bg-[#fc5e6e] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" onClick={deleteAction} disabled={deleteActivityLoading} >Hapus</button>
 										</div>
 									</div>
 								</Dialog.Panel>
@@ -110,10 +150,10 @@ export default function CardTodo(props: CardActivity) {
 								leaveTo="opacity-0 scale-95"
 							>
 								<Dialog.Panel className="relative transform text-left shadow-xl transition-all w-fit my-auto opacity-100 translate-y-0 sm:scale-100">
-									<div className='bg-white p-6 flex gap-4 items-center w-[497px] rounded-xl'>
-										<Information />
+									<div className='bg-white p-6 flex gap-4 items-center w-full sm:w-[497px] rounded-xl'>
+										{deleteActivitySuccess ? <InformationSuccess /> : deleteActivityError ? <InformationFailed /> : null}
 										<span>
-											<h2>Activity berhasil dihapus</h2>
+											<h2>Activity {deleteActivitySuccess ? 'berhasil' : deleteActivityError ? 'tidak berhasil' : null} dihapus</h2>
 										</span>
 									</div>
 								</Dialog.Panel>
@@ -123,6 +163,6 @@ export default function CardTodo(props: CardActivity) {
 				</Dialog>
 			</Transition>
 			
-		</>
+		</div>
 	);
 }

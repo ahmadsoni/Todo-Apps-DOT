@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import axios, {type AxiosInstance, type AxiosResponse} from 'axios';
-import {type Activity, type ActivityAddUpdate} from './data-types';
+import {type Activity, type ActivityAddUpdate, type CardActivity} from './data-types';
 
 const api: AxiosInstance = axios.create({
 	baseURL: process.env.NEXT_PUBLIC_BASE_URL,
@@ -11,9 +11,9 @@ export const getActivity = async (): Promise<Activity[]> => {
 	return response.data.data.slice(0, 40);
 };
 
-export const getOneActivity = async (id: number): Promise<Activity[]> => {
-	const response: AxiosResponse<{data: Activity[]}> = await api.get(`/activity-groups/${id}`);
-	return response.data.data;
+export const getOneActivity = async (id: string): Promise<CardActivity> => {
+	const response: AxiosResponse<CardActivity> = await api.get(`/activity-groups/${id}`);
+	return response.data;
 };
 
 export const addActivity = async (title: string, email: string) => {
@@ -24,7 +24,7 @@ export const addActivity = async (title: string, email: string) => {
 	return response.data.data;
 };
 
-export const updateActivity = async (id: number, title: string): Promise<Activity[]> => {
+export const updateActivity = async (id: string, title?: string): Promise<Activity[]> => {
 	const response:  AxiosResponse<{data: Activity[]}> = await api.patch(`/activity-groups/${id}`, {
 		title,
 	});

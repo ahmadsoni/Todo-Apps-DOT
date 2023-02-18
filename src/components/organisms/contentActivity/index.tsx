@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState, Fragment} from 'react';
+import {useEffect, useState, Fragment} from 'react';
 import Arrow from '@/images/arrow.svg';
 import EditButton from '@/images/edit-button.svg';
 import Sort from '@/images/sort.svg';
@@ -11,14 +11,17 @@ import Image from 'next/legacy/image';
 import type {SizeType} from 'antd/es/config-provider/SizeContext';
 import {PlusOutlined} from '@ant-design/icons';
 import {Dialog, Transition, Listbox} from '@headlessui/react';
-
+import * as api from '@/services/activityApi';
+import * as base from '@/services/todoApi';
+import {useMutation, type UseMutationResult, type MutationFunction, useQuery, QueryClient} from 'react-query';
+import {type Activity, type UpdateActivityForm, type CardActivity, type AddTodoList, type Todo, type ContentActivityProps} from '@/services/data-types';
 const priority = [
 	{name:'Pilih Priority', color: ''},
-	{name: 'Very High', color: 'danger'},
-	{name: 'High', color: 'warning'},
-	{name: 'Medium', color: 'success'},
-	{name: 'Low', color: 'dodger'},
-	{name: 'Very Low', color: 'purple'},
+	{name: 'Very High', color: 'danger', prio: 'very-high'},
+	{name: 'High', color: 'warning', prio: 'high'},
+	{name: 'Medium', color: 'success', prio: 'normal'},
+	{name: 'Low', color: 'dodger', prio: 'low'},
+	{name: 'Very Low', color: 'purple', prio: 'very-low'},
 ];
 
 const filter = [
@@ -29,36 +32,119 @@ const filter = [
 	{name:'Z-A', type:'filter-4'},
 	{name:'Belum Selesai', type:'filter-5'},
 ];
-export default function ContentActivity() {
+const queryClient = new QueryClient();
+function updateActivityTitle(): UseMutationResult<Activity[], Error, UpdateActivityForm> {
+	const mutationFn: MutationFunction<Activity[], UpdateActivityForm> = async (input) => {
+		const {title, id} = input;
+		const data = await api.updateActivity(id, title);
+		return data;
+	};
+
+	 return useMutation(mutationFn, {
+		async onSuccess() {
+			await queryClient.invalidateQueries('todo-activity');
+		}});
+}
+
+function addTodoList(): UseMutationResult<Todo[], Error, AddTodoList> {
+	const mutationFn: MutationFunction<Todo[], AddTodoList> = async (input) => {
+		const {activityId, title, priority} = input;
+		const response = await base.addTodo(activityId, title, priority);
+		return response.data;
+	};
+
+	return useMutation(mutationFn, {
+		async onSuccess() {
+			await queryClient.invalidateQueries('list-todo');
+		},
+	});
+}
+
+export default function ContentActivity(props: ContentActivityProps) {
+	const {id, title} = props;
 	const [size, setSize] = useState<SizeType>('large');
 	const [edit, setEdit] = useState(false);
 	const [selected, setSelected] = useState(priority[0]);
 	const [filterSelect, setfilterSelect] = useState(filter[0]);
 	const [isOpen, setIsOpen] = useState(false);
-	function handleBlur(event: React.FocusEvent<HTMLInputElement>): void {
-		setEdit(false);
-	}
-	
-	function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
-		setEdit(!edit);
-	}
-	
+	const [allowAdd, setAllowAdd] = useState(true);
+	const [activityTittle, setActivityTittle] = useState<string | undefined>(title);
+	const [todoTitle, setTodoTitle] = useState<string | undefined>('');
+	const {refetch: refethActivity} = useQuery('todo-activity', {
+		refetchOnWindowFocus: true,
+		refetchOnMount: true,
+	});
+	const {refetch: refethListTodo} = useQuery('list-todo', {
+		refetchOnWindowFocus: true,
+		refetchOnMount: true,
+	});
+	useEffect(() => {    
+		setActivityTittle(title);
+	}, [title]);
 
+	const handleBlur = async (event: React.FocusEvent<HTMLInputElement>) => {
+		updateActivityMutate({title: activityTittle, id});
+		setTimeout(async ()=>{
+			await refethActivity();
+			setEdit(false);
+			setSelected(priority[0]);
+		}, 500);
+	};
+
+
+	const {mutate: updateActivityMutate, isLoading: updateActivityLoading, isError: updateActivityError, isSuccess: updateActivitySuccess} = updateActivityTitle();
+	const {mutate: addTodoListMutate, isLoading: addTodoListLoading, isError: addTodoListError, isSuccess: addTodoListSuccess} = addTodoList();
+	function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
+		setEdit(true);
+	}
+
+	const handleChangeTitle = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setActivityTittle(e.target.value);
+	};
+
+	const hadleChangeTodo = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setTodoTitle(e.target.value);
+	};
+
+	const handleAddTodoList = () => {
+		addTodoListMutate({activityId: id, title: todoTitle, priority: selected.prio});
+		setTimeout(async () =>{
+			await refethListTodo();
+			setIsOpen(false);
+			setSelected(priority[0]);
+		}, 500);
+	};
+
+	useEffect(() => {
+		if (selected.color !== '' && todoTitle !== '') {
+			setAllowAdd(false);
+		}
+	}, [selected, todoTitle]);
 	return (
 		<>
-			<div className='flex justify-between mb-6 mt-10'>
-				<div className='flex items-center gap-3'>
+			<div className='flex flex-col sm:flex-row justify-between mb-6 mt-10'>
+				<div className='flex items-center gap-3 sm:mr-4'>
 					<Link href='/'>
 						<Arrow />
 					</Link>
-					<div  className='flex items-center gap-3 false border-black py-2 edit'>
-						{edit ? <input type="text" className='bg-transparent text-black text-2.25xl leading-2.5xl outline-none border-b-2 border-black w-500 font-bold text-2xl' value="New Activity" onBlur={handleBlur} />  : <h1 className='font-bold text-3xl'>New Activity</h1>}
+					<div className='flex items-center gap-3 false border-black py-2 edit'>
+						{edit ? (
+							<input
+								type="text"
+								className='bg-transparent text-black text-2xl sm:text-2.25xl leading-2.5xl outline-none border-b-2 border-black w-full max-w-[240px] sm:max-w-[400px] font-bold'
+								value={activityTittle}
+								onBlur={handleBlur}
+								onChange={handleChangeTitle}
+							/>
+						) : (
+							<h1 className='font-bold text-2xl sm:text-3xl'>{title}</h1>
+						)}
 					</div>
 					<button onClick={handleClick}>
 						<EditButton />
 					</button>
 				</div>
-				<div className='flex items-center gap-3'>
+				<div className='flex items-center gap-3 mt-4 sm:mt-0 ml-auto'>
 					<div className='relative flex gap-3 items-center'>
 						<Listbox value={filterSelect} onChange={setfilterSelect}>
 							<Listbox.Button className='border border-gray-300 px-5 py-5 rounded-full text-gray-500 p-4 gap-3 flex'>
@@ -130,6 +216,8 @@ export default function ContentActivity() {
 			<Transition appear show={isOpen} as={Fragment}>
 				<Dialog as="div" className="relative z-10" onClose={() => {
 					setIsOpen(false);
+					setAllowAdd(false);
+					setSelected(priority[0]);
 				}}>
 					<Transition.Child
 						as={Fragment}
@@ -155,11 +243,13 @@ export default function ContentActivity() {
 								leaveTo="opacity-0 scale-95"
 							>
 								<Dialog.Panel className="relative transform text-left shadow-xl transition-all w-fit my-auto opacity-100 translate-y-0 sm:scale-100">
-									<div className='bg-white p-6  w-[830px] rounded-xl'>
+									<div className='bg-white p-6 w-full sm:w-[830px] rounded-xl'>
 										<div className='flex justify-between items-center px-8 py-6 border-b-2'>
 											<h4 className="font-semibold text-xl">Tambah List Item</h4>
 											<button type="button" className='cursor-pointer' onClick={() => {
 												setIsOpen(false);
+												setAllowAdd(false);
+												setSelected(priority[0]);
 											}}>
 												<Close />
 											</button>
@@ -167,7 +257,7 @@ export default function ContentActivity() {
 										<div className='px-8 py-6'>
 											<div className='mb-6'>
 												<label className='font-semibold text-sm'>NAMA LIST ITEM</label>
-												<input type="text" className={'w-full px-4 py-3 mt-2 border border-1 rounded focus:outline-4 outline-blue-200'} placeholder="Tambahkan nama item" data-cy="modal-add-name-input" value=""/>
+												<input type="text" className={'w-full px-4 py-3 mt-2 border border-1 rounded focus:outline-4 outline-blue-200'} placeholder="Tambahkan nama item" data-cy="modal-add-name-input" onChange={hadleChangeTodo} />
 											</div>
 											<div className='mb-6'>
 												<label className='font-semibold text-sm'>PRIORITY</label>
@@ -227,7 +317,7 @@ export default function ContentActivity() {
 											</div>
 										</div>
 										<div className='px-8 py-6 border-t-2 flex justify-end'>
-											<button className="border-2 rounded-full py-3 px-6  font-medium text-lg bg-primary text-white ml-auto w-[150px] opacity-50 cursor-default">Simpan</button>
+											<button className={`border-2 rounded-full py-3 px-6 font-normal sm:font-medium text-lg bg-primary text-white ml-auto w-[130px] sm:w-[150px] ${allowAdd ? 'opacity-50 cursor-not-allowed' : 'opacity-100'} cursor-pointer`} disabled={allowAdd} onClick={handleAddTodoList}>Simpan</button>
 										</div>
 									</div>
 								</Dialog.Panel>

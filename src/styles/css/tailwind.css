@@ -52,3 +52,7 @@ button.bloc:hover svg.plus .plus_svg__plus {
 .bg-purple{
   background-color: #8942C1;
 }
+
+.grow {
+    flex-grow: 1;
+}
