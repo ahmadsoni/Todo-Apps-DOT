@@ -18,10 +18,7 @@ function useAddActivity(): UseMutationResult<Activity[], Error, AddActivityForm>
 		return data;
 	};
 
-	 return useMutation(mutationFn, {
-		async onSuccess() {
-			await queryClient.invalidateQueries('todo-apps');
-		}});
+	 return useMutation(mutationFn);
 }
 
 export default function Content() {
