@@ -64,12 +64,12 @@ export default function CardTodo(props: CardActivity) {
 	}, [deleteActivityError, deleteActivitySuccess]);
 	return (
 		<div>
-			<div className='bg-white shadow-lg rounded-xl h-56 p-4 flex flex-col w-[320px] sm:w-[230px] mt-4'>
-				<h4  className="grow text-lg font-bold cursor-pointer pt-2 hover:text-primary">
-					<Link href={`/detail/${id}`}>
+			<div className='bg-white shadow-lg rounded-xl h-56 p-4 flex flex-col justify-between w-[320px] sm:w-[230px] mt-4'>
+				<Link href={`/detail/${id}`} className='grow group'>
+					<h4  className="text-lg font-bold cursor-pointer pt-2 group-hover:text-primary">
 						{title}
-					</Link>
-				</h4>
+					</h4>
+				</Link>
 				<div className='flex justify-between'>
 					<span className="text-secondary font-semibold text-base font-poppins">{formattedDate}</span>
 					<div className='cursor-pointer flex items-center'>

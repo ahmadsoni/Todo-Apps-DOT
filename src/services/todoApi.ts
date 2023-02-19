@@ -28,9 +28,7 @@ export const addTodo = async (activityId: string, title?: string, priority?: str
 	return response.data;
 };
 
-export const updateTodo = async (activityId: number,
-	title: string,
-	priority: string): Promise<{data: Todo[]}> => {
+export const updateTodoList = async (activityId: string, title?: string, priority?: string): Promise<{data: Todo[]}> => {
 	const response: AxiosResponse<{data: Todo[]}> = await base.patch(`/todo-items/${activityId}`, {
 		title,
 		priority,

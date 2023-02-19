@@ -3,16 +3,19 @@ import {Checkbox} from 'antd';
 import type {CheckboxChangeEvent} from 'antd/es/checkbox';
 import EditButton from '@/images/edit-button.svg';
 import Trash from '@/images/trash.svg';
-import {type UpdateCheckTodoProps, type AddActivityForm, type CardActivity, type GetStaticProps, type Todo, type SendIdProps} from '@/services/data-types';
+import {type UpdateCheckTodoProps, type UpdateActivityProps, type CardActivity, type GetStaticProps, type Todo, type SendIdProps} from '@/services/data-types';
 import * as base from '@/services/todoApi';
 import {useMutation, type UseMutationResult, type MutationFunction, useQuery, QueryClient} from 'react-query';
-import {Dialog, Transition} from '@headlessui/react';
+import {Dialog, Transition, Listbox} from '@headlessui/react';
 import Warning from '@/images/warning.svg';
 import InformationSuccess from '@/images/information-success.svg';
 import InformationFailed from '@/images/information-failed.svg';
-
+import Close from '@/images/close.svg';
+import Checklist from '@/images/checklist.svg';
+import SelectDown from '@/images/select-down.svg';
 
 const queryClient = new QueryClient();
+
 function checkColor(color: string) {
 	switch (color) {
 		case 'very-high':
@@ -53,6 +56,20 @@ function updateCheckTodo(): UseMutationResult<Todo[], Error, UpdateCheckTodoProp
 	});
 }
 
+function updateTodoListFetch(): UseMutationResult<Todo[], Error, UpdateActivityProps> {
+	const mutationFn: MutationFunction<Todo[], UpdateActivityProps> = async (input) => {
+		const {activityId, title, priority} = input;
+		const {data} = await base.updateTodoList(activityId, title, priority);
+		return data;
+	};
+
+	return useMutation(mutationFn, {
+		async onSuccess() {
+			await queryClient.invalidateQueries('list-todo');
+		},
+	});
+}
+
 function deleteTodoList(): UseMutationResult<Todo[], Error, string> {
 	const mutationFn: MutationFunction<Todo[], string> = async (id) => {
 		const {data} = await base.deleteTodoList(id);
@@ -66,17 +83,56 @@ function deleteTodoList(): UseMutationResult<Todo[], Error, string> {
 	});
 }
 
+
+const priority = [
+	{name:'Pilih Priority', color: ''},
+	{name: 'Very High', color: 'danger', prio: 'very-high'},
+	{name: 'High', color: 'warning', prio: 'high'},
+	{name: 'Medium', color: 'success', prio: 'normal'},
+	{name: 'Low', color: 'dodger', prio: 'low'},
+	{name: 'Very Low', color: 'purple', prio: 'very-low'},
+];
 export default function ListTodo(props: SendIdProps) {
 	const {id} = props;
 	const [isOpen, setIsOpen] = useState(false);
 	const [isOpen2, setIsOpen2] = useState(false);
+	const [isOpen3, setIsOpen3] = useState(false);
+	const [allowAdd, setAllowAdd] = useState(false);
+	const [selected, setSelected] = useState(priority[0]);
+	const [todoTitle, setTodoTitle] = useState<string | undefined>('');
 	const [deleteTodoProps, setDeleteTodoProps ] = useState({
 		id: '',
 		title: '',
 	});
+	const [updateIdTodoList, setUpdateIdTodoList] = useState('');
 	const [edit, setEdit] = useState(false);
-	function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
-		setEdit(!edit);
+	const handleEditTodo = (title: string, priority: string, id: string) => {
+		setUpdateIdTodoList(id);
+		checkColorUpdate(priority);
+		setTodoTitle(title);
+		setIsOpen3(true);
+	};
+
+	function checkColorUpdate(color: string) {
+		switch (color) {
+			case 'very-high':
+				setSelected(priority[1]);
+				break;
+			case 'high':
+				setSelected(priority[2]);
+				break;
+			case 'normal':
+				setSelected(priority[3]);
+				break;
+			case 'low':
+				setSelected(priority[4]);
+				break;
+			case 'very-low':
+				setSelected(priority[5]);
+				break;
+			default:
+				setSelected(priority[0]);
+		}
 	}
 
 	const handleCheckTodo = ({activityId, isActive, title}: UpdateCheckTodoProps) => {
@@ -106,9 +162,24 @@ export default function ListTodo(props: SendIdProps) {
 		deleteModal();
 	};
 
-	
+	const hadleChangeTodo = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setTodoTitle(e.target.value);
+	};
+
+	const handleAddTodoList = () => {
+		updateTodoListMutate({activityId: updateIdTodoList, title: todoTitle, priority: selected.prio});
+		setTimeout(async () =>{
+			await todoRefetch();
+			setIsOpen3(false);
+			setSelected(priority[0]);
+		}, 500);
+	};
+
 	const {mutate: updateCheckTodoMutate, isLoading: updateCheckTodoLoading, isError: updateCheckTodoError, isSuccess: updateCheckTodoSuccess} = updateCheckTodo();
 	const {mutate: deleteTodoListMutate, isLoading: deleteTodoListLoading, isError: deleteTodoListError, isSuccess: deleteTodoListSuccess} = deleteTodoList();
+	const {mutate: updateTodoListMutate, isLoading: updateTodoListLoading, isError: updateTodoListError, isSuccess: updateTodoListSuccess} = updateTodoListFetch();
+
+
 	const {data:todoData, isLoading: todoIsLoading, isError: todoIsError, isSuccess: todoIsSuccess, refetch: todoRefetch} = useQuery<Todo []>(
 		'list-todo', {
 			refetchOnWindowFocus: true,
@@ -129,6 +200,14 @@ export default function ListTodo(props: SendIdProps) {
 	useEffect(() => {
 		deleteHandle();
 	}, [deleteTodoListError, deleteTodoListSuccess]);
+
+	useEffect(() => {
+		if (todoTitle === '') {
+			setAllowAdd(true);
+		} else {
+			setAllowAdd(false);
+		}
+	}, [todoTitle]);
 	return (
 		<>
 			<div className='pt-6 pb-10 flex flex-col gap-3'>
@@ -145,7 +224,9 @@ export default function ListTodo(props: SendIdProps) {
 								<span className={` ${todo.is_active ? '' : 'text-secondary line-through'}`}>
 									{todo.title}
 								</span>
-								<button onClick={handleClick}>
+								<button onClick={()=>{
+									handleEditTodo(todo.title, todo.priority, todo.id.toString());
+								}}>
 									<EditButton />
 								</button>
 							</div>
@@ -238,6 +319,123 @@ export default function ListTodo(props: SendIdProps) {
 										<span>
 											<h2>Activity {deleteTodoListSuccess ? 'berhasil' : deleteTodoListError ? 'tidak berhasil' : null} dihapus</h2>
 										</span>
+									</div>
+								</Dialog.Panel>
+							</Transition.Child>
+						</div>
+					</div>
+				</Dialog>
+			</Transition>
+			<Transition appear show={isOpen3} as={Fragment}>
+				<Dialog as="div" className="relative z-10" onClose={() => {
+					setIsOpen(false);
+					setSelected(priority[0]);
+				}}>
+					<Transition.Child
+						as={Fragment}
+						enter="ease-out duration-300"
+						enterFrom="opacity-0"
+						enterTo="opacity-100"
+						leave="ease-in duration-200"
+						leaveFrom="opacity-100"
+						leaveTo="opacity-0"
+					>
+						<div className="fixed inset-0 bg-black bg-opacity-25" />
+					</Transition.Child>
+
+					<div className="fixed inset-0 overflow-y-auto">
+						<div className="flex min-h-full items-center justify-center p-4 text-center">
+							<Transition.Child
+								as={Fragment}
+								enter="ease-out duration-300"
+								enterFrom="opacity-0 scale-95"
+								enterTo="opacity-100 scale-100"
+								leave="ease-in duration-200"
+								leaveFrom="opacity-100 scale-100"
+								leaveTo="opacity-0 scale-95"
+							>
+								<Dialog.Panel className="relative transform text-left shadow-xl transition-all w-fit my-auto opacity-100 translate-y-0 sm:scale-100">
+									<div className='bg-white p-6 w-full sm:w-[830px] rounded-xl'>
+										<div className='flex justify-between items-center px-8 py-6 border-b-2'>
+											<h4 className="font-semibold text-xl">Tambah List Item</h4>
+											<button type="button" className='cursor-pointer' onClick={() => {
+												setIsOpen3(false);
+												setSelected(priority[0]);
+											}}>
+												<Close />
+											</button>
+										</div>
+										<div className='px-8 py-6'>
+											<div className='mb-6'>
+												<label className='font-semibold text-sm'>NAMA LIST ITEM</label>
+												<input 
+													type="text" 
+													className={'w-full px-4 py-3 mt-2 border border-1 rounded focus:outline-4 outline-blue-200'} 
+													placeholder="Tambahkan nama item" 
+													onChange={hadleChangeTodo} 
+													value={todoTitle} 
+												/>
+											</div>
+											<div className='mb-6'>
+												<label className='font-semibold text-sm'>PRIORITY</label>
+												<Listbox value={selected} onChange={setSelected}>
+													<div className="relative mt-1">
+														<Listbox.Button className="relative cursor-default  p-3 outline outline-1 outline-slate-200 w-[207px] rounded flex justify-between items-center shadow-top">
+															<div className='flex items-center gap-3'>
+																<div className={`w-3 h-3 rounded-full bg-${selected.color}`}></div>
+																<span className="block truncate">{selected.name}</span>
+															</div>
+															<span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+																<SelectDown />
+															</span>
+														</Listbox.Button>
+														<Transition
+															as={Fragment}
+															leave="transition ease-in duration-100"
+															leaveFrom="opacity-100"
+															leaveTo="opacity-0"
+														>
+															<Listbox.Options className="absolute mt-1 w-[207px] overflow-auto rounded-md bg-white py-1 text-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-base">
+																{priority.slice(1).map((priority, personIdx) => (
+																	<Listbox.Option
+																		key={personIdx}
+																		className={({active, selected}) =>
+																			`relative cursor-default select-none py-2 ${
+																				active ? 'bg-blue-200' : 'text-gray-900'
+																			} ${ selected ? 'bg-blue-200' : 'text-gray-900'}`
+																		}
+																		value={priority}
+																	>
+																		{({selected}) => (
+																			<div className='relative flex justify-between items-center p-2'>
+																				<div className='flex items-center gap-3'>
+																					<div className={`w-3 h-3 rounded-full bg-${priority.color}`}></div>
+																					<span
+																						className={`block truncate ${
+																							selected ? 'font-medium' : 'font-normal'
+																						}`}
+																					>
+																						{priority.name}
+																					</span>
+																				</div>
+																				{selected ? (
+																					<div className=''>
+																						<Checklist />
+																					</div>
+																				) : null}
+																			</div>
+																		)}
+																	</Listbox.Option>
+																))}
+															</Listbox.Options>
+														</Transition>
+													</div>
+												</Listbox>
+											</div>
+										</div>
+										<div className='px-8 py-6 border-t-2 flex justify-end'>
+											<button className={`border-2 rounded-full py-3 px-6 font-normal sm:font-medium text-lg bg-primary text-white ml-auto w-[130px] sm:w-[150px] ${allowAdd ? 'opacity-50 cursor-not-allowed' : 'opacity-100'} cursor-pointer`} disabled={allowAdd} onClick={handleAddTodoList}>Simpan</button>
+										</div>
 									</div>
 								</Dialog.Panel>
 							</Transition.Child>

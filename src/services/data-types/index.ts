@@ -46,6 +46,11 @@ export type UpdateActivityForm = {
 	title?: string;
 };
 
+export type UpdateActivityProps = {
+	activityId: string;
+	title?: string;
+	priority?: string;
+};
 export type UpdateCheckTodoProps = {
 	activityId: string;
 	title?: string;
